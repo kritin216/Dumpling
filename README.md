@@ -103,7 +103,9 @@ dumpling-buddy/
 
 ## Co-developed by
 
-[Your Name] — with AI assistance from Claude (Anthropic)
+[Kritin Bindlish] 
+[Riddhima Chawla]
+— with AI assistance from Claude (Anthropic)
 
 ---
 
