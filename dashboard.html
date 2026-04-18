@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Dumpling Buddy</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+body { background: #f5f0eb; color: #2d2d2d; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+.hdr { padding: 11px 16px; background: white; border-bottom: 1px solid #e8e0d8; display: flex; align-items: center; gap: 9px; flex-shrink: 0; }
+.hdr h1 { font-size: 18px; color: #cc6633; font-weight: 600; }
+.hdr small { font-size: 11px; color: #bbb; }
+.dot { width: 9px; height: 9px; border-radius: 50%; margin-left: auto; flex-shrink: 0; cursor: help; }
+.on  { background: #4caf50; }
+.off { background: #f44336; }
+
+.tabs { display: flex; background: white; border-bottom: 2px solid #f0e8e0; overflow-x: auto; flex-shrink: 0; }
+.tab { padding: 9px 12px; border: none; background: none; cursor: pointer; font-size: 12px; color: #999; white-space: nowrap; border-bottom: 2px solid transparent; margin-bottom: -2px; font-family: inherit; transition: .15s; }
+.tab.active { color: #cc6633; border-bottom-color: #cc6633; font-weight: 600; }
+.tab:hover  { color: #cc6633; background: #faf7f4; }
+
+.body { flex: 1; overflow-y: auto; padding: 13px; }
+.pnl { display: none; }
+.pnl.on { display: block; }
+
+.card { background: white; border-radius: 11px; padding: 14px; margin-bottom: 11px; box-shadow: 0 1px 5px rgba(0,0,0,0.05); }
+.card h2 { font-size: 12px; color: #cc6633; margin-bottom: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; }
+.hint { font-size: 11px; color: #bbb; margin-bottom: 9px; line-height: 1.6; }
+
+textarea, input[type=text], input[type=number], select {
+  width: 100%; padding: 8px 10px; border: 1.5px solid #e0d8d0;
+  border-radius: 8px; font-size: 13px; background: #faf8f5; color: #333;
+  outline: none; font-family: inherit; resize: vertical;
+}
+textarea:focus, input:focus, select:focus { border-color: #cc6633; }
+
+.row { display: flex; gap: 6px; align-items: center; margin-bottom: 7px; flex-wrap: wrap; }
+.row span { font-size: 13px; }
+
+.btn { padding: 8px 14px; border-radius: 8px; border: none; cursor: pointer; font-size: 12px; font-family: inherit; transition: .15s; }
+.full { width: 100%; margin-top: 8px; }
+.btn:hover    { opacity: .85; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.p  { background: #cc6633; color: white; }
+.p:hover { background: #b85a2a; }
+.g  { background: #4caf50; color: white; }
+.r  { background: #f44336; color: white; }
+.b  { background: #2196f3; color: white; }
+.gr { background: #e8e0d8; color: #555; }
+.stop { background: #f44336; color: white; padding: 8px 10px; border-radius: 8px; border: none; cursor: pointer; font-size: 12px; font-family: inherit; flex-shrink: 0; }
+
+.out { background: #faf5f0; border-radius: 8px; padding: 12px; margin-top: 10px; font-size: 13px; line-height: 1.8; border: 1px solid #e8e0d8; display: none; white-space: pre-wrap; color: #444; max-height: 300px; overflow-y: auto; }
+.out.on { display: block; }
+
+#chatlog { height: 170px; overflow-y: auto; padding: 10px; background: #faf8f5; border-radius: 8px; border: 1px solid #e8e0d8; font-size: 13px; margin-bottom: 8px; }
+.mu { color: #cc6633; margin-bottom: 4px; font-weight: 500; }
+.mb { color: #2d7a4a; margin-bottom: 7px; }
+.mt { color: #bbb; font-style: italic; }
+
+/* camera */
+#camwrap { background: #111; border-radius: 10px; overflow: hidden; position: relative; width: 100%; aspect-ratio: 4/3; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; }
+#camvid  { width: 100%; height: 100%; object-fit: cover; display: none; }
+#camcvs  { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+#camph   { color: #666; font-size: 13px; text-align: center; padding: 18px; line-height: 1.8; }
+#camlive { position: absolute; top: 7px; left: 7px; background: rgba(255,0,0,.65); color: white; font-size: 11px; padding: 3px 8px; border-radius: 12px; display: none; }
+
+.mrow { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+.ml   { font-size: 11px; width: 60px; color: #aaa; flex-shrink: 0; }
+.mbg  { flex: 1; height: 7px; background: #f0e8e0; border-radius: 3px; overflow: hidden; }
+.mb2  { height: 100%; border-radius: 3px; width: 0%; transition: width .35s ease; }
+.mv   { font-size: 10px; width: 28px; color: #bbb; text-align: right; }
+.mhappy   { background: #4caf50; }
+.mneutral { background: #999; }
+.msad     { background: #5c6bc0; }
+.mfearful { background: #ef5350; }
+.mangry   { background: #f44336; }
+.mstress  { background: #ff9800; }
+.mpanic   { background: linear-gradient(90deg,#ff9800,#f44336); }
+
+.aitems { max-height: 120px; overflow-y: auto; }
+.ai { padding: 5px 9px; border-radius: 6px; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.apanic  { background: #ffebee; border-left: 3px solid #f44336; }
+.astress { background: #fff8e1; border-left: 3px solid #ff9800; }
+.ahabit  { background: #e8f5e9; border-left: 3px solid #4caf50; }
+.at { color: #bbb; font-size: 11px; margin-left: auto; }
+
+.hi { display: flex; align-items: center; gap: 6px; padding: 6px 8px; background: #faf5f0; border-radius: 7px; margin-bottom: 5px; font-size: 13px; }
+.hd { width: 7px; height: 7px; background: #4caf50; border-radius: 50%; flex-shrink: 0; }
+
+/* quiet mode */
+#qo { display: none; position: fixed; top:0;left:0;right:0;bottom:0; background: rgba(8,14,32,.96); z-index:9999; flex-direction:column; align-items:center; justify-content:center; color:white; }
+#qo.on { display: flex; }
+#bc  { width:170px;height:170px;border-radius:50%;background:radial-gradient(circle at 38% 38%,#7ec8e3,#1a5fa8);display:flex;align-items:center;justify-content:center;font-size:14px;color:rgba(255,255,255,.85);transition:transform 4s ease-in-out; }
+#bp  { margin-top:26px;font-size:20px;font-weight:300;letter-spacing:2px; }
+#bsub{ margin-top:10px;font-size:13px;opacity:.4;max-width:250px;text-align:center;line-height:1.6; }
+#btm { margin-top:12px;font-size:11px;opacity:.25; }
+#bcl { margin-top:24px;background:rgba(255,255,255,.1);color:white;border:1px solid rgba(255,255,255,.2);padding:7px 20px;border-radius:18px;cursor:pointer;font-size:12px;font-family:inherit; }
+
+/* onboarding */
+#ob { display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:8888;align-items:center;justify-content:center;padding:14px; }
+#ob.on { display:flex; }
+.oc { background:white;border-radius:16px;padding:24px;max-width:440px;width:100%;max-height:88vh;overflow-y:auto;box-shadow:0 18px 50px rgba(0,0,0,.28); }
+.oc h2  { color:#cc6633;font-size:18px;margin-bottom:4px; }
+.oc > p { font-size:12px;color:#bbb;margin-bottom:16px;line-height:1.6; }
+.fl { margin-bottom:12px; }
+.fl label { display:block;font-size:12px;color:#888;margin-bottom:4px;font-weight:500; }
+.cg { display:flex;flex-wrap:wrap;gap:6px;margin-top:3px; }
+.cg label { display:flex;align-items:center;gap:4px;background:#faf5f0;border:1px solid #e8e0d8;border-radius:16px;padding:4px 10px;font-size:11px;cursor:pointer;color:#666; }
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <span style="font-size:22px">🥟</span>
+  <div><h1>Dumpling Buddy</h1><small>Accessibility companion</small></div>
+  <div id="aidot" class="dot off" title="AI — green=ready, red=run: ollama serve"></div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="go('buddy',this)">🥟 Buddy</button>
+  <button class="tab" onclick="go('camera',this)">📷 Camera</button>
+  <button class="tab" onclick="go('decoder',this)">🔍 Decoder</button>
+  <button class="tab" onclick="go('pushback',this)">🛡 Pushback</button>
+  <button class="tab" onclick="go('chat',this)">💬 Chat</button>
+  <button class="tab" onclick="go('reminders',this)">⏰ Reminders</button>
+  <button class="tab" onclick="go('settings',this)">⚙ Settings</button>
+</div>
+
+<div class="body">
+
+  <!-- BUDDY -->
+  <div id="tab-buddy" class="pnl on">
+    <div class="card">
+      <h2>Buddy controls</h2>
+      <div class="row">
+        <button class="btn g" onclick="ipcRenderer.send('show-buddy')">Show</button>
+        <button class="btn r" onclick="ipcRenderer.send('hide-buddy')">Hide</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Speak</h2>
+      <input type="text" id="speakin" placeholder="Type something for Dumpling to say..."/>
+      <div style="display:flex;gap:6px">
+        <button class="btn p full" onclick="speakIt()" style="flex:3">▶ Speak</button>
+        <button class="stop" onclick="ipcRenderer.send('stop-speak')" style="flex:1;margin-top:8px">⏹</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>🫁 Quiet Mode</h2>
+      <p class="hint">No sounds. No pressure. Breathes with you for 60 seconds.</p>
+      <button class="btn p full" style="background:#1a5fa8" onclick="startQM()">Activate Quiet Mode</button>
+    </div>
+    <div class="card">
+      <h2>Profile</h2>
+      <p class="hint" id="profline">Loading...</p>
+      <button class="btn gr" onclick="document.getElementById('ob').classList.add('on')">Edit profile</button>
+    </div>
+  </div>
+
+  <!-- CAMERA -->
+  <div id="tab-camera" class="pnl">
+    <div class="card">
+      <h2>📷 Live emotion detection</h2>
+      <p class="hint" id="mdlstatus">⏳ Loading face models...</p>
+      <div class="row" style="margin-bottom:9px">
+        <button class="btn g" id="btcs" onclick="startCam()">▶ Start camera</button>
+        <button class="btn r" id="btcx" onclick="stopCam()" disabled>⏹ Stop</button>
+        <button class="btn gr" id="btlm" onclick="toggleLM()">Hide landmarks</button>
+      </div>
+      <div id="camwrap">
+        <video id="camvid" autoplay muted playsinline></video>
+        <canvas id="camcvs"></canvas>
+        <div id="camlive">🔴 LIVE</div>
+        <div id="camph">
+          <div style="font-size:32px;margin-bottom:7px">📷</div>
+          <div>Press Start camera above</div>
+          <div id="camphsub" style="font-size:11px;color:#4caf50;margin-top:5px">Loading models...</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Emotion meters</h2>
+      <div id="noface" style="font-size:11px;color:#ccc;text-align:center;padding:5px;display:none">No face detected</div>
+      <div class="mrow"><span class="ml">😊 Happy</span>  <div class="mbg"><div id="m-happy"   class="mb2 mhappy"></div></div>  <span class="mv" id="v-happy">0%</span></div>
+      <div class="mrow"><span class="ml">😐 Neutral</span><div class="mbg"><div id="m-neutral" class="mb2 mneutral"></div></div><span class="mv" id="v-neutral">0%</span></div>
+      <div class="mrow"><span class="ml">😢 Sad</span>    <div class="mbg"><div id="m-sad"     class="mb2 msad"></div></div>    <span class="mv" id="v-sad">0%</span></div>
+      <div class="mrow"><span class="ml">😨 Fearful</span><div class="mbg"><div id="m-fearful" class="mb2 mfearful"></div></div><span class="mv" id="v-fearful">0%</span></div>
+      <div class="mrow"><span class="ml">😠 Angry</span>  <div class="mbg"><div id="m-angry"   class="mb2 mangry"></div></div>  <span class="mv" id="v-angry">0%</span></div>
+      <hr style="border:none;border-top:1px solid #f0e8e0;margin:8px 0">
+      <div class="mrow"><span class="ml" style="color:#ff9800">🔥 Stress</span><div class="mbg"><div id="m-stress" class="mb2 mstress"></div></div><span class="mv" id="v-stress">0%</span></div>
+      <div class="mrow"><span class="ml" style="color:#f44336">⚡ Panic</span> <div class="mbg"><div id="m-panic"  class="mb2 mpanic"></div></div> <span class="mv" id="v-panic">0%</span></div>
+    </div>
+    <div class="card">
+      <h2>Habit tracking</h2>
+      <p class="hint">Dumpling gives a gentle alert when it spots these habits via face analysis.</p>
+      <div id="hlist"></div>
+      <div class="row" style="margin-top:6px">
+        <input type="text" id="hinput" placeholder="e.g. nail biting, hair touching..." style="flex:1"/>
+        <button class="btn g" onclick="addHabit()">+ Add</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Alert history</h2>
+      <div class="aitems" id="alog"><p style="font-size:11px;color:#ccc;text-align:center">No alerts yet</p></div>
+    </div>
+  </div>
+
+  <!-- DECODER -->
+  <div id="tab-decoder" class="pnl">
+    <div class="card">
+      <h2>🔍 Corporate decoder</h2>
+      <p class="hint">Paste any confusing work message. Get a plain breakdown.</p>
+      <textarea id="decin" rows="4" placeholder='"Do the needful and circle back with synergy by EOD."'></textarea>
+      <div style="display:flex;gap:6px">
+        <button class="btn p full" id="btdec" onclick="runDecoder()" style="flex:1">Decode</button>
+        <button class="stop" onclick="ipcRenderer.send('stop-speak');document.getElementById('btdec').disabled=false" style="margin-top:8px">⏹</button>
+      </div>
+      <div id="decout" class="out"></div>
+    </div>
+  </div>
+
+  <!-- PUSHBACK -->
+  <div id="tab-pushback" class="pnl">
+    <div class="card">
+      <h2>🛡 Polite pushback builder</h2>
+      <p class="hint">Get 3 short professional replies to say no.</p>
+      <div class="fl"><label>What are you working on?</label><input type="text" id="pba" placeholder="e.g. 3 urgent PRs due today"/></div>
+      <div class="fl"><label>What were you just asked to do?</label><input type="text" id="pbb" placeholder="e.g. Code review a PR"/></div>
+      <div class="fl"><label>What worries you? (optional)</label><input type="text" id="pbc" placeholder="e.g. They'll think I'm not capable"/></div>
+      <div style="display:flex;gap:6px">
+        <button class="btn p full" id="btpb" onclick="runPushback()" style="flex:1">Build options</button>
+        <button class="stop" onclick="ipcRenderer.send('stop-speak')" style="margin-top:8px">⏹</button>
+      </div>
+      <div id="pbout" class="out"></div>
+    </div>
+  </div>
+
+  <!-- CHAT -->
+  <div id="tab-chat" class="pnl">
+    <div class="card">
+      <h2>💬 Chat with Dumpling</h2>
+      <div id="chatlog"></div>
+      <input type="text" id="chatin" placeholder="Talk to Dumpling..." onkeydown="if(event.key==='Enter')sendChat()"/>
+      <div style="display:flex;gap:6px">
+        <button class="btn p full" id="btch" onclick="sendChat()" style="flex:1">Send</button>
+        <button class="stop" onclick="ipcRenderer.send('stop-speak')" style="margin-top:8px">⏹</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- REMINDERS -->
+  <div id="tab-reminders" class="pnl">
+    <div class="card">
+      <h2>⏰ Reminders</h2>
+      <div class="row"><span>💧 Water every</span><input type="number" id="wmin" value="45" min="5"  max="180" style="width:58px"/><span>min</span><button class="btn g" onclick="startR('water')">On</button><button class="btn gr" onclick="stopR('water')">Off</button></div>
+      <div class="row"><span>🧘 Break every</span> <input type="number" id="bmin" value="60" min="10" max="240" style="width:58px"/><span>min</span><button class="btn g" onclick="startR('break')">On</button><button class="btn gr" onclick="stopR('break')">Off</button></div>
+      <div class="row"><span>🪑 Posture every</span><input type="number" id="pmin" value="30" min="5"  max="90"  style="width:58px"/><span>min</span><button class="btn g" onclick="startR('posture')">On</button><button class="btn gr" onclick="stopR('posture')">Off</button></div>
+      <div id="rstatus" style="font-size:12px;color:#4caf50;margin-top:7px;min-height:16px"></div>
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div id="tab-settings" class="pnl">
+    <div class="card">
+      <h2>🔊 Voice</h2>
+      <p class="hint">Uses your default Windows voice. To change it: Windows Settings → Time &amp; Language → Speech → choose a voice there.</p>
+      <button class="btn b" onclick="ipcRenderer.send('speak','Hi! I am Dumpling, your workplace companion.')">Test voice</button>
+    </div>
+    <div class="card">
+      <h2>🤖 AI Status</h2>
+      <p class="hint">Uses <strong>tinyllama</strong> (offline). If the dot is red, open cmd and run: <code>ollama serve</code></p>
+      <button class="btn gr" onclick="checkAI()">Check now</button>
+      <p id="aimsg" style="font-size:11px;margin-top:6px;color:#aaa"></p>
+    </div>
+    <div class="card">
+      <h2>📷 Camera models</h2>
+      <p class="hint">If camera fails, open cmd in the app folder and run: <code>node setup-models.js</code> then restart.</p>
+      <button class="btn gr" onclick="testModels()">Test model files</button>
+      <p id="modmsg" style="font-size:11px;margin-top:6px;color:#aaa"></p>
+    </div>
+  </div>
+
+</div>
+
+<!-- QUIET MODE -->
+<div id="qo">
+  <div id="bc">breathe</div>
+  <div id="bp">Inhale...</div>
+  <div id="bsub">You're safe. One breath at a time.</div>
+  <div id="btm"></div>
+  <button id="bcl" onclick="endQM()">End early</button>
+</div>
+
+<!-- ONBOARDING -->
+<div id="ob">
+  <div class="oc">
+    <h2>👋 Hi! I'm Dumpling.</h2>
+    <p>Tell me a bit about you. Everything stays on your device only.</p>
+    <div class="fl"><label>Your name</label><input type="text" id="obname" placeholder="First name"/></div>
+    <div class="fl"><label>Pronouns (optional)</label><input type="text" id="obpron" placeholder="she/her, he/him, they/them"/></div>
+    <div class="fl"><label>Your job</label><input type="text" id="objob" placeholder="e.g. Software developer, designer"/></div>
+    <div class="fl"><label>What's hardest at work? (pick all)</label>
+      <div class="cg">
+        <label><input type="checkbox" value="Understanding vague messages"> Vague messages</label>
+        <label><input type="checkbox" value="Saying no"> Saying no</label>
+        <label><input type="checkbox" value="Unexpected changes"> Surprises</label>
+        <label><input type="checkbox" value="Sensory overload"> Overload</label>
+        <label><input type="checkbox" value="Heavy workload"> Workload</label>
+        <label><input type="checkbox" value="Office politics"> Politics</label>
+      </div>
+    </div>
+    <div class="fl"><label>How do you prefer to be spoken to?</label><input type="text" id="obcomm" placeholder="Short and direct, step by step, no jargon"/></div>
+    <div class="fl"><label>Habits to watch for:</label>
+      <div class="cg">
+        <label><input type="checkbox" value="nail biting"> Nail biting</label>
+        <label><input type="checkbox" value="hair touching"> Hair touching</label>
+        <label><input type="checkbox" value="skin picking"> Skin picking</label>
+        <label><input type="checkbox" value="lip biting"> Lip biting</label>
+      </div>
+    </div>
+    <button class="btn p full" onclick="saveOB()">Let's go 🥟</button>
+  </div>
+</div>
+
+<script src="node_modules/face-api.js/dist/face-api.min.js"></script>
+
+<script>
+'use strict'
+const { ipcRenderer } = require('electron')
+const path = require('path')
+const fs   = require('fs')
+
+// ── MODEL_URL is set dynamically from the HTTP server port ──
+// This is fetched from main.js via IPC in init() before
+// loadModels() is called. Do NOT hardcode a file:// path here.
+let MODEL_URL = ''
+
+let DB       = null
+let camOn    = false, camStream = null, camLoop = null
+let showLM   = true,  modelsOK  = false
+let panicSec = 0, stressSec = 0, lastAlert = 0
+const COOLDOWN = 25000
+const rtimers  = {}
+
+// ════════════════════════════════════════
+// INIT — fetch model server port first
+// ════════════════════════════════════════
+async function init() {
+  DB = await ipcRenderer.invoke('db-load')
+
+  // Get the port of the local HTTP model server started in main.js
+  const port = await ipcRenderer.invoke('get-model-port')
+  MODEL_URL  = 'http://127.0.0.1:' + port
+  console.log('Model URL set to:', MODEL_URL)
+
+  if (!DB.onboardingComplete) document.getElementById('ob').classList.add('on')
+  else updateProf()
+  renderHabits()
+  checkAI()
+  setInterval(checkAI, 20000)
+  loadModels()
+}
+
+async function loadModels() {
+  const st  = document.getElementById('mdlstatus')
+  const sub = document.getElementById('camphsub')
+  try {
+    st.textContent  = '⏳ Loading detector...'; sub.textContent = 'Loading detector...'
+    await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL)
+
+    st.textContent  = '⏳ Loading landmarks...'; sub.textContent = 'Loading landmarks...'
+    await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL)
+
+    st.textContent  = '⏳ Loading expressions...'; sub.textContent = 'Loading expressions...'
+    await faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL)
+
+    modelsOK = true
+    st.textContent  = '✅ Models ready — press Start camera'
+    st.style.color  = '#4caf50'
+    sub.textContent = '✅ Press Start camera'
+    sub.style.color = '#4caf50'
+    console.log('✓ Face models loaded from', MODEL_URL)
+  } catch (e) {
+    const msg = `❌ Model load failed: ${e.message}\n\nFix:\n1. Run: node setup-models.js\n2. Wait for ALL 6/6\n3. Restart the app`
+    st.textContent  = msg; st.style.color  = '#f44336'
+    sub.textContent = '❌ Models failed'; sub.style.color = '#f44336'
+    console.error('Model load error:', e)
+  }
+}
+
+async function checkAI() {
+  try {
+    const r = await fetch('http://localhost:11434/api/tags', { signal: AbortSignal.timeout(2000) })
+    if (!r.ok) throw new Error()
+    document.getElementById('aidot').className = 'dot on'
+    document.getElementById('aimsg').textContent = '✓ Ollama connected'
+    document.getElementById('aimsg').style.color = '#4caf50'
+  } catch {
+    document.getElementById('aidot').className = 'dot off'
+    document.getElementById('aimsg').textContent = '✗ Ollama offline — open cmd and run: ollama serve'
+    document.getElementById('aimsg').style.color = '#f44336'
+  }
+}
+
+function testModels() {
+  const files = [
+    'tiny_face_detector_model-weights_manifest.json',
+    'face_landmark_68_model-weights_manifest.json',
+    'face_expression_model-weights_manifest.json'
+  ]
+  let ok = true
+  files.forEach(f => {
+    const fp = path.join(__dirname, 'models', f)
+    if (!fs.existsSync(fp)) { ok = false; return }
+    try { JSON.parse(fs.readFileSync(fp, 'utf8')) } catch { ok = false }
+  })
+  const msg = document.getElementById('modmsg')
+  msg.textContent = ok ? '✅ All model files present' : '❌ Files missing. Run: node setup-models.js'
+  msg.style.color = ok ? '#4caf50' : '#f44336'
+}
+
+// ════════════════════════════════════════
+// TABS
+// ════════════════════════════════════════
+function go(n, el) {
+  document.querySelectorAll('.pnl').forEach(p => p.classList.remove('on'))
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
+  document.getElementById('tab-' + n).classList.add('on')
+  el.classList.add('active')
+}
+
+// ════════════════════════════════════════
+// ONBOARDING
+// ════════════════════════════════════════
+async function saveOB() {
+  const name = document.getElementById('obname').value.trim()
+  if (!name) { alert('Please enter your name!'); return }
+  const HABIT_VALS = ['nail biting','hair touching','skin picking','lip biting']
+  const checks = [...document.querySelectorAll('#ob .cg input:checked')]
+  DB.user = {
+    name,
+    pronouns: document.getElementById('obpron').value.trim(),
+    jobRole:  document.getElementById('objob').value.trim(),
+    challenges: checks.filter(c => !HABIT_VALS.includes(c.value)).map(c => c.value).join(', '),
+    communicationStyle: document.getElementById('obcomm').value.trim()
+  }
+  DB.onboardingComplete = true
+  checks.filter(c => HABIT_VALS.includes(c.value)).forEach(c => {
+    if (!DB.habits.find(h => h.name === c.value)) DB.habits.push({ name: c.value, addedAt: Date.now() })
+  })
+  await ipcRenderer.invoke('db-save', DB)
+  document.getElementById('ob').classList.remove('on')
+  updateProf(); renderHabits()
+  const g = `Hi ${name}! I am Dumpling, your workplace companion.`
+  ipcRenderer.send('speak', g)
+  ipcRenderer.send('buddy-speak-bubble', g)
+  ipcRenderer.send('show-buddy')
+  ipcRenderer.send('buddy-set-state', 'talking')
+  setTimeout(() => ipcRenderer.send('buddy-set-state', 'idle'), 5000)
+}
+
+function updateProf() {
+  const u = DB?.user
+  document.getElementById('profline').textContent = u
+    ? `${u.name} · ${u.jobRole || 'role not set'} · ${(DB.conversations||[]).length} messages`
+    : 'No profile yet.'
+}
+
+// ════════════════════════════════════════
+// BUDDY
+// ════════════════════════════════════════
+function speakIt() {
+  const t = document.getElementById('speakin').value.trim()
+  if (!t) return
+  ipcRenderer.send('speak', t)
+  ipcRenderer.send('buddy-speak-bubble', t)
+  ipcRenderer.send('buddy-set-state', 'talking')
+  setTimeout(() => ipcRenderer.send('buddy-set-state', 'idle'), Math.min(t.length * 80, 12000))
+}
+
+// ════════════════════════════════════════
+// CAMERA
+// ════════════════════════════════════════
+async function startCam() {
+  if (!modelsOK) {
+    alert('Models not ready.\n1. Run: node setup-models.js\n2. Wait for ALL 6/6\n3. Restart the app')
+    return
+  }
+  try {
+    const vid = document.getElementById('camvid')
+    const cvs = document.getElementById('camcvs')
+    camStream = await navigator.mediaDevices.getUserMedia({ video: { width:{ideal:640}, height:{ideal:480}, facingMode:'user' } })
+    vid.srcObject = camStream
+    await new Promise(r => vid.onloadedmetadata = r)
+    await vid.play()
+    cvs.width  = vid.videoWidth  || 640
+    cvs.height = vid.videoHeight || 480
+    vid.style.display = 'block'
+    document.getElementById('camph').style.display   = 'none'
+    document.getElementById('camlive').style.display = 'block'
+    camOn = true
+    document.getElementById('btcs').disabled = true
+    document.getElementById('btcx').disabled = false
+    panicSec = 0; stressSec = 0
+    detect()
+  } catch (e) { alert('Camera error: ' + e.message) }
+}
+
+function stopCam() {
+  camOn = false
+  if (camLoop)   { clearTimeout(camLoop); camLoop = null }
+  if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null }
+  const vid = document.getElementById('camvid')
+  vid.srcObject = null; vid.style.display = 'none'
+  document.getElementById('camph').style.display   = 'flex'
+  document.getElementById('camlive').style.display = 'none'
+  document.getElementById('btcs').disabled = false
+  document.getElementById('btcx').disabled = true
+  document.getElementById('noface').style.display  = 'none'
+  clearM()
+}
+
+async function detect() {
+  if (!camOn) return
+  const vid = document.getElementById('camvid')
+  const cvs = document.getElementById('camcvs')
+  const ctx = cvs.getContext('2d')
+  try {
+    const result = await faceapi
+      .detectSingleFace(vid, new faceapi.TinyFaceDetectorOptions({ scoreThreshold: 0.2, inputSize: 320 }))
+      .withFaceLandmarks()
+      .withFaceExpressions()
+    ctx.clearRect(0, 0, cvs.width, cvs.height)
+    if (result) {
+      document.getElementById('noface').style.display = 'none'
+      drawFace(ctx, result, cvs)
+      processExpr(result)
+    } else {
+      document.getElementById('noface').style.display = 'block'
+      clearM()
+      panicSec  = Math.max(0, panicSec  - 0.5)
+      stressSec = Math.max(0, stressSec - 0.5)
+    }
+  } catch (e) { console.warn('Detection error:', e.message) }
+  camLoop = setTimeout(detect, 500)
+}
+
+function drawFace(ctx, r, cvs) {
+  const dims = { width: cvs.width, height: cvs.height }
+  const rs   = faceapi.resizeResults(r, dims)
+  const b    = rs.detection.box
+  ctx.strokeStyle = '#cc6633'; ctx.lineWidth = 2.5
+  ctx.strokeRect(b.x, b.y, b.width, b.height)
+  const pct = Math.round(r.detection.score * 100)
+  ctx.fillStyle = 'rgba(204,102,51,0.85)'; ctx.fillRect(b.x, b.y - 20, 64, 19)
+  ctx.fillStyle = 'white'; ctx.font = 'bold 11px Segoe UI'
+  ctx.fillText(`Face ${pct}%`, b.x + 5, b.y - 5)
+  if (showLM) {
+    rs.landmarks.positions.forEach(pt => { ctx.beginPath(); ctx.arc(pt.x,pt.y,1.8,0,2*Math.PI); ctx.fillStyle='rgba(204,102,51,0.55)'; ctx.fill() })
+    ;[rs.landmarks.getLeftEye(), rs.landmarks.getRightEye()].forEach(eye => { ctx.beginPath(); ctx.moveTo(eye[0].x,eye[0].y); eye.forEach(p=>ctx.lineTo(p.x,p.y)); ctx.closePath(); ctx.strokeStyle='rgba(33,150,243,0.8)'; ctx.lineWidth=1.5; ctx.stroke() })
+    const m = rs.landmarks.getMouth(); ctx.beginPath(); ctx.moveTo(m[0].x,m[0].y); m.forEach(p=>ctx.lineTo(p.x,p.y)); ctx.closePath(); ctx.strokeStyle='rgba(76,175,80,0.8)'; ctx.lineWidth=1.5; ctx.stroke()
+  }
+  const topExpr = Object.entries(r.expressions).sort((a,b)=>b[1]-a[1])[0]
+  const emo = { happy:'😊',neutral:'😐',sad:'😢',fearful:'😨',angry:'😠',surprised:'😲',disgusted:'🤢' }
+  ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(b.x, b.y+b.height, b.width, 22)
+  ctx.fillStyle='white'; ctx.font='12px Segoe UI'
+  ctx.fillText(`${emo[topExpr[0]]||'😐'} ${topExpr[0]} ${Math.round(topExpr[1]*100)}%`, b.x+5, b.y+b.height+15)
+}
+
+function processExpr(r) {
+  const e  = r.expressions
+  const lm = r.landmarks
+  setM('happy',   e.happy   || 0); setM('neutral', e.neutral || 0)
+  setM('sad',     e.sad     || 0); setM('fearful',  e.fearful || 0); setM('angry', e.angry || 0)
+  const stress = Math.min(1, (e.fearful||0)*1.8 + (e.sad||0)*0.7 + (e.angry||0)*0.6)
+  const panic  = Math.min(1, (e.fearful||0)*2.2 + (e.surprised||0)*0.4)
+  let eyeBoost = 0
+  try { const ear = (eyeAR(lm.getLeftEye()) + eyeAR(lm.getRightEye())) / 2; eyeBoost = ear > 0.36 ? 0.25 : 0 } catch {}
+  const fp = Math.min(1, panic + eyeBoost), fs = Math.min(1, stress)
+  setM('stress', fs); setM('panic', fp)
+  if (fp > 0.6)              ipcRenderer.send('buddy-set-state', 'quiet')
+  else if ((e.happy||0) > 0.5) ipcRenderer.send('buddy-set-state', 'happy')
+  else                        ipcRenderer.send('buddy-set-state', 'idle')
+  const now = Date.now()
+  if (fp > 0.5) { panicSec += 0.5; if (panicSec >= 7 && now - lastAlert > COOLDOWN) { lastAlert = now; panicSec = 0; fireAlert('panic', fp, 'Sustained distress detected') } } else { panicSec = Math.max(0, panicSec - 0.4) }
+  if (fs > 0.42) { stressSec += 0.5; if (stressSec >= 18 && now - lastAlert > COOLDOWN) { lastAlert = now; stressSec = 0; fireAlert('stress_high', fs, 'Sustained stress detected') } } else { stressSec = Math.max(0, stressSec - 0.3) }
+  if (DB?.habits?.length > 0) { try { const occ = occScore(r); if (occ > 0.65 && now - lastAlert > COOLDOWN) { lastAlert = now; fireAlert('habit_detected', occ, `Possible ${DB.habits[0].name} detected`) } } catch {} }
+}
+
+function eyeAR(eye) {
+  if (!eye || eye.length < 6) return 0.3
+  const d = (a,b) => Math.hypot(a.x-b.x, a.y-b.y)
+  return (d(eye[1],eye[5]) + d(eye[2],eye[4])) / (2*d(eye[0],eye[3]) + 0.001)
+}
+function occScore(r) {
+  const s = r.detection.score; if (s < 0.32) return 0.8
+  const m = r.landmarks.getMouth(); const mw = Math.hypot(m[0].x-m[6].x,m[0].y-m[6].y); const mh = Math.hypot(m[3].x-m[9].x,m[3].y-m[9].y); const ar = mh/(mw+0.001)
+  if (ar > 0.65) return 0.78; if (s < 0.45 && ar > 0.38) return 0.67; return 0
+}
+function toggleLM() { showLM = !showLM; document.getElementById('btlm').textContent = showLM ? 'Hide landmarks' : 'Show landmarks' }
+function setM(id,v) { const pct=Math.round(Math.max(0,Math.min(1,v))*100); const b=document.getElementById('m-'+id); const l=document.getElementById('v-'+id); if(b)b.style.width=pct+'%'; if(l)l.textContent=pct+'%' }
+function clearM() { ['happy','neutral','sad','fearful','angry','stress','panic'].forEach(k=>setM(k,0)) }
+
+async function fireAlert(type, conf, desc) {
+  await ipcRenderer.invoke('db-save-camera-event', { type, confidence: conf, description: desc })
+  DB = await ipcRenderer.invoke('db-load')
+  addAlertUI(type, conf, desc)
+  if (type === 'panic') setTimeout(startQM, 2000)
+}
+function addAlertUI(type, conf, desc) {
+  const log = document.getElementById('alog'); const ph = log.querySelector('p'); if(ph) ph.remove()
+  const cls = type==='panic'?'apanic':type==='habit_detected'?'ahabit':'astress'
+  const ico = type==='panic'?'🚨':type==='habit_detected'?'👋':'⚠️'
+  const div = document.createElement('div'); div.className='ai '+cls
+  div.innerHTML=`<span>${ico}</span><span>${desc} (${Math.round(conf*100)}%)</span><span class="at">${new Date().toLocaleTimeString()}</span>`
+  log.insertBefore(div, log.firstChild)
+}
+
+// ════════════════════════════════════════
+// HABITS
+// ════════════════════════════════════════
+async function addHabit() {
+  const inp = document.getElementById('hinput'); const n = inp.value.trim(); if(!n) return
+  DB = await ipcRenderer.invoke('db-load')
+  if(!DB.habits.find(h=>h.name===n)) DB.habits.push({ name:n, addedAt:Date.now() })
+  await ipcRenderer.invoke('db-save', DB); inp.value=''; renderHabits()
+}
+function renderHabits() {
+  const l = document.getElementById('hlist')
+  if(!DB?.habits?.length) { l.innerHTML='<p style="font-size:11px;color:#ccc">None added yet.</p>'; return }
+  l.innerHTML = DB.habits.map(h=>`<div class="hi"><div class="hd"></div><span>${h.name}</span></div>`).join('')
+}
+
+// ════════════════════════════════════════
+// AI FEATURES
+// Prompts are kept short and rigid so tinyllama
+// can actually follow them (1B model).
+// systemOverride gives each feature its own
+// tight instructions. useContext=false for
+// decoder/pushback (no user profile needed).
+// ════════════════════════════════════════
+async function runDecoder() {
+  const msg = document.getElementById('decin').value.trim(); if (!msg) return
+  const out = document.getElementById('decout'), btn = document.getElementById('btdec')
+  out.className='out on'; btn.disabled=true; out.textContent='Analysing...'
+  ipcRenderer.send('buddy-set-state','thinking')
+
+  const r = await ipcRenderer.invoke('ask-ollama', {
+    useContext: false,
+    systemOverride:
+      'You decode confusing work messages into plain English. ' +
+      'Always reply in exactly this format:\n' +
+      'WHAT THEY MEAN: (1 sentence)\n' +
+      'WHAT TO DO: (1-2 actions)\n' +
+      'URGENCY: (low/medium/high and why)',
+    prompt: `Decode this message: "${msg}"`
+  })
+
+  out.textContent = r.text; btn.disabled = false
+  ipcRenderer.send('buddy-set-state','talking')
+  if (r.ok) ipcRenderer.send('speak', 'I decoded that for you.')
+  setTimeout(() => ipcRenderer.send('buddy-set-state','idle'), 5000)
+}
+
+async function runPushback() {
+  const a = document.getElementById('pba').value.trim()
+  const b = document.getElementById('pbb').value.trim(); if (!a || !b) return
+  const c = document.getElementById('pbc').value.trim()
+  const out = document.getElementById('pbout'), btn = document.getElementById('btpb')
+  out.className='out on'; btn.disabled=true; out.textContent='Writing options...'
+  ipcRenderer.send('buddy-set-state','thinking')
+
+  const r = await ipcRenderer.invoke('ask-ollama', {
+    useContext: false,
+    systemOverride:
+      'You write 3 numbered, polite, professional one-sentence replies to decline extra work. ' +
+      'Label them 1. 2. 3. Nothing else.',
+    prompt:
+      `I am doing: ${a}\n` +
+      `I was asked to: ${b}\n` +
+      (c ? `My worry: ${c}\n` : '') +
+      `Write 3 polite one-sentence ways to say I cannot do this right now.`
+  })
+
+  out.textContent = r.text; btn.disabled = false
+  ipcRenderer.send('buddy-set-state','idle')
+}
+
+async function sendChat() {
+  const inp = document.getElementById('chatin')
+  const msg = inp.value.trim(); if (!msg) return
+  inp.value = ''
+  const log  = document.getElementById('chatlog')
+  const name = DB?.user?.name || 'You'
+
+  log.innerHTML += `<div class="mu">${name}: ${msg}</div>`
+  await ipcRenderer.invoke('db-save-message', { role:'user', content:msg })
+
+  const el = document.createElement('div'); el.className='mt mb'; el.textContent='🥟 thinking...'
+  log.appendChild(el); log.scrollTop = log.scrollHeight
+
+  document.getElementById('btch').disabled = true
+  ipcRenderer.send('buddy-set-state','thinking')
+
+  const r = await ipcRenderer.invoke('ask-ollama', {
+    useContext: true,
+    prompt: msg
+    // Uses BASE_SYSTEM from main.js — kind, 1-2 sentences, no jargon
+  })
+
+  el.remove()
+  log.innerHTML += `<div class="mb">🥟 Dumpling: ${r.text}</div>`
+  await ipcRenderer.invoke('db-save-message', { role:'assistant', content:r.text })
+  log.scrollTop = log.scrollHeight
+
+  ipcRenderer.send('speak', r.text)
+  ipcRenderer.send('buddy-speak-bubble', r.text)
+  ipcRenderer.send('buddy-set-state','talking')
+  setTimeout(() => ipcRenderer.send('buddy-set-state','idle'), 6000)
+  document.getElementById('btch').disabled = false
+}
+
+// ════════════════════════════════════════
+// REMINDERS
+// ════════════════════════════════════════
+const rmsg = {
+  water:   'Time for a glass of water. Staying hydrated helps you focus.',
+  break:   'Five minute break. Step away from the screen.',
+  posture: 'Posture check. Sit up, drop your shoulders, unclench your jaw.'
+}
+function startR(type) {
+  const key = type==='water'?'w':type==='break'?'b':'p'
+  const mins = parseInt(document.getElementById(key+'min').value)
+  if (rtimers[type]) clearInterval(rtimers[type])
+  rtimers[type] = setInterval(() => {
+    ipcRenderer.send('speak', rmsg[type])
+    ipcRenderer.send('buddy-speak-bubble', type==='water'?'💧 Water!':type==='break'?'🧘 Break!':'🪑 Posture!')
+    ipcRenderer.send('buddy-set-state','talking')
+    setTimeout(() => ipcRenderer.send('buddy-set-state','idle'), 5000)
+  }, mins * 60000)
+  document.getElementById('rstatus').textContent = `✓ ${type} reminder every ${mins} minutes`
+}
+function stopR(type) {
+  if (rtimers[type]) { clearInterval(rtimers[type]); delete rtimers[type] }
+  document.getElementById('rstatus').textContent = `${type} reminder stopped`
+}
+
+// ════════════════════════════════════════
+// QUIET MODE
+// ════════════════════════════════════════
+let qT = null
+function startQM() {
+  document.getElementById('qo').classList.add('on')
+  ipcRenderer.send('buddy-set-state','quiet')
+  const c=document.getElementById('bc'), p=document.getElementById('bp'), t=document.getElementById('btm')
+  let total=60, ss=0, pi=0
+  const phases=[{l:'Inhale...',s:4,sc:1.5},{l:'Hold...',s:7,sc:1.5},{l:'Breathe out...',s:8,sc:0.85}]
+  function tick() {
+    if(total<=0){endQM();return}
+    const ph=phases[pi]; p.textContent=ph.l; c.style.transition=`transform ${ph.s}s ease-in-out`; c.style.transform=`scale(${ph.sc})`; t.textContent=`${total}s remaining`
+    total--; ss++; if(ss>=ph.s){ss=0;pi=(pi+1)%3}; qT=setTimeout(tick,1000)
+  }
+  tick()
+}
+function endQM() {
+  clearTimeout(qT); document.getElementById('qo').classList.remove('on')
+  document.getElementById('bc').style.transform='scale(1)'; ipcRenderer.send('buddy-set-state','idle')
+}
+
+// ════════════════════════════════════════
+// IPC FROM MAIN
+// ════════════════════════════════════════
+ipcRenderer.on('trigger-quiet-mode', () => startQM())
+ipcRenderer.on('camera-alert', (e, a) => {
+  addAlertUI(a.type, a.confidence, a.description || a.type)
+  if (a.type === 'panic') setTimeout(startQM, 2500)
+})
+
+init()
+</script>
+</body>
+</html>

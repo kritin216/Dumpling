@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  background: transparent !important;
+  overflow: hidden;
+  width: 100vw; height: 100vh;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: flex-end;
+  user-select: none;
+}
+#bubble {
+  background: rgba(255,255,255,0.97);
+  border-radius: 14px 14px 14px 4px;
+  padding: 9px 13px;
+  font-size: 12px; max-width: 190px;
+  margin-bottom: 6px;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.16);
+  display: none; color: #333;
+  line-height: 1.5; font-family: 'Segoe UI', sans-serif;
+  text-align: center; word-break: break-word;
+  animation: pop 0.18s ease-out;
+  pointer-events: none;
+}
+@keyframes pop { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+#buddy-img {
+  width: 170px; height: 170px;
+  object-fit: contain;
+  cursor: grab;
+  display: block;
+  margin-bottom: 8px;
+  -webkit-user-drag: none;
+}
+#buddy-img.grabbed { cursor: grabbing; }
+
+#glow {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(circle at center, rgba(255,50,50,0.2) 0%, transparent 65%);
+  display: none; pointer-events: none;
+  animation: glow-pulse 1.2s ease-in-out infinite;
+}
+@keyframes glow-pulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+
+#ctx {
+  display: none; position: fixed;
+  background: white; border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.18);
+  padding: 5px 0; min-width: 155px;
+  font-family: 'Segoe UI', sans-serif; font-size: 13px;
+  border: 1px solid rgba(0,0,0,0.08); z-index: 9999;
+}
+.ctx-item { padding: 9px 15px; cursor: pointer; color: #333; }
+.ctx-item:hover { background: #f5f0eb; }
+.ctx-sep { border: none; border-top: 1px solid #f0e8e0; margin: 4px 0; }
+</style>
+</head>
+<body>
+
+<div id="glow"></div>
+<div id="bubble"></div>
+<img id="buddy-img" src="animations/idle.gif" alt="Dumpling"/>
+
+<div id="ctx">
+  <div class="ctx-item" id="ctx-dash">📊 Open Dashboard</div>
+  <div class="ctx-item" id="ctx-quiet">🫁 Quiet Mode</div>
+  <hr class="ctx-sep"/>
+  <div class="ctx-item" id="ctx-hide" style="color:#888">👋 Hide</div>
+</div>
+
+<script>
+const { ipcRenderer } = require('electron')
+
+// ════════════════════════════════════════
+// ANIMATIONS
+// ════════════════════════════════════════
+const ANIM = {
+  idle:     'animations/idle.gif',
+  happy:    'animations/happy.gif',
+  quiet:    'animations/quiet.gif',
+  talking:  'animations/talking.gif',
+  thinking: 'animations/thinking.gif',
+  sleeping: 'animations/sleeping.gif'
+}
+
+const img     = document.getElementById('buddy-img')
+const bubble  = document.getElementById('bubble')
+const glow    = document.getElementById('glow')
+const ctxMenu = document.getElementById('ctx')
+
+let currentState = 'idle'
+let sleepTimer   = null
+let bubbleTimer  = null
+
+function setState(s) {
+  if (!ANIM[s]) s = 'idle'
+  currentState = s
+  img.src = ANIM[s] + '?t=' + Date.now()
+  resetSleep()
+}
+
+function resetSleep() {
+  clearTimeout(sleepTimer)
+  if (['sleeping', 'quiet'].includes(currentState)) return
+  sleepTimer = setTimeout(() => {
+    if (currentState === 'idle') setState('sleeping')
+  }, 60000)
+}
+
+// ════════════════════════════════════════
+// PHYSICS — slow bouncing with gravity
+// ════════════════════════════════════════
+let wx = window.screenLeft
+let wy = window.screenTop
+let vx = 0.6
+let vy = 0
+let dragging    = false
+let dragOX = 0, dragOY = 0
+let lastMX = 0, lastMY = 0
+let clickPaused = false
+let pauseTimer  = null
+
+const W  = window.outerWidth  || 220
+const H  = window.outerHeight || 280
+const SW = window.screen.availWidth
+const SH = window.screen.availHeight
+
+const MAX_VX      = 2.0
+const MAX_VY      = 6.0
+const GRAVITY     = 0.12
+const BOUNCE_DAMP = 0.55
+const WALL_DAMP   = 0.80
+
+function physicsStep() {
+  if (dragging || clickPaused) return
+
+  vy += GRAVITY
+  wx += vx
+  wy += vy
+
+  // Floor (above taskbar)
+  const floor = SH - H
+  if (wy >= floor) {
+    wy = floor
+    vy = -Math.abs(vy) * BOUNCE_DAMP
+    if (Math.abs(vy) < 0.8) vy = 0
+    vx += (Math.random() - 0.5) * 0.4
+    vx = Math.max(-MAX_VX, Math.min(MAX_VX, vx))
+  }
+
+  // Ceiling
+  if (wy < 0) { wy = 0; vy = Math.abs(vy) * 0.4 }
+
+  // Left wall
+  if (wx <= 0) { wx = 0; vx = Math.abs(vx) * WALL_DAMP }
+
+  // Right wall
+  if (wx >= SW - W) { wx = SW - W; vx = -Math.abs(vx) * WALL_DAMP }
+
+  // Clamp velocities
+  vx = Math.max(-MAX_VX, Math.min(MAX_VX, vx))
+  vy = Math.max(-MAX_VY, Math.min(MAX_VY, vy))
+
+  window.moveTo(Math.round(wx), Math.round(wy))
+}
+
+setInterval(physicsStep, 16)
+
+// ── Drag ──
+img.addEventListener('mousedown', e => {
+  if (e.button !== 0) return
+  dragging = true
+  clickPaused = false
+  clearTimeout(pauseTimer)
+  img.classList.add('grabbed')
+  dragOX = e.screenX - window.screenLeft
+  dragOY = e.screenY - window.screenTop
+  lastMX = e.screenX
+  lastMY = e.screenY
+  if (currentState === 'sleeping') setState('happy')
+  e.preventDefault()
+})
+
+document.addEventListener('mousemove', e => {
+  if (!dragging) return
+  const nx = e.screenX - dragOX
+  const ny = e.screenY - dragOY
+  vx = (e.screenX - lastMX) * 0.6
+  vy = (e.screenY - lastMY) * 0.6
+  lastMX = e.screenX
+  lastMY = e.screenY
+  wx = nx; wy = ny
+  window.moveTo(nx, ny)
+})
+
+document.addEventListener('mouseup', e => {
+  if (e.button !== 0 || !dragging) return
+  dragging = false
+  img.classList.remove('grabbed')
+
+  // Slow the throw right down
+  vx = Math.max(-MAX_VX, Math.min(MAX_VX, vx * 0.3))
+  vy = Math.max(-4,      Math.min(4,      vy * 0.3))
+
+  // Pause for 60 seconds after release
+  clickPaused = true
+  clearTimeout(pauseTimer)
+  pauseTimer = setTimeout(() => {
+    clickPaused = false
+    vx = (Math.random() > 0.5 ? 1 : -1) * (0.3 + Math.random() * 0.4)
+    vy = 0
+  }, 60000)
+})
+
+// ── Click = happy + pause ──
+img.addEventListener('click', e => {
+  if (e.button !== 0 || dragging) return
+  setState('happy')
+  ipcRenderer.send('speak', 'Hi there!')
+
+  clickPaused = true
+  clearTimeout(pauseTimer)
+  pauseTimer = setTimeout(() => {
+    clickPaused = false
+    vx = (Math.random() > 0.5 ? 1 : -1) * (0.3 + Math.random() * 0.4)
+  }, 60000)
+
+  setTimeout(() => setState('idle'), 3000)
+})
+
+// Wake on mouse movement
+document.addEventListener('mousemove', () => {
+  if (currentState === 'sleeping' && !dragging) setState('idle')
+  else resetSleep()
+})
+
+// ════════════════════════════════════════
+// RIGHT-CLICK CONTEXT MENU
+// ════════════════════════════════════════
+img.addEventListener('contextmenu', e => {
+  e.preventDefault()
+  ctxMenu.style.display = 'block'
+  ctxMenu.style.left = Math.min(e.clientX, window.innerWidth  - 160) + 'px'
+  ctxMenu.style.top  = Math.max(0, e.clientY - 100) + 'px'
+})
+
+document.addEventListener('click', e => {
+  if (!ctxMenu.contains(e.target)) ctxMenu.style.display = 'none'
+})
+
+document.getElementById('ctx-dash').onclick  = () => { ctxMenu.style.display = 'none'; ipcRenderer.send('show-dashboard') }
+document.getElementById('ctx-quiet').onclick = () => { ctxMenu.style.display = 'none'; ipcRenderer.send('show-dashboard'); setTimeout(() => ipcRenderer.send('trigger-quiet-mode'), 300) }
+document.getElementById('ctx-hide').onclick  = () => { ctxMenu.style.display = 'none'; ipcRenderer.send('hide-buddy') }
+
+// ════════════════════════════════════════
+// IPC FROM MAIN / DASHBOARD
+// ════════════════════════════════════════
+ipcRenderer.on('set-state', (e, s) => setState(s))
+
+ipcRenderer.on('show-bubble', (e, text) => {
+  clearTimeout(bubbleTimer)
+  bubble.textContent = text
+  bubble.style.display = 'block'
+  bubbleTimer = setTimeout(() => { bubble.style.display = 'none' }, 6000)
+})
+
+ipcRenderer.on('camera-alert', (e, alert) => {
+  const msgs = {
+    panic:          "I see you're struggling. Breathe with me 💙",
+    stress_high:    "You seem stressed. I've got you. 🌿",
+    habit_detected: "Gentle nudge — you okay? 🥟"
+  }
+  bubble.textContent = msgs[alert.type] || 'Are you okay?'
+  bubble.style.display = 'block'
+  glow.style.display = alert.type === 'panic' ? 'block' : 'none'
+  setState('quiet')
+  clearTimeout(bubbleTimer)
+  bubbleTimer = setTimeout(() => {
+    bubble.style.display = 'none'
+    glow.style.display = 'none'
+    setState('idle')
+  }, 10000)
+})
+
+resetSleep()
+</script>
+</body>
+</html>

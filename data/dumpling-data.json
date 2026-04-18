@@ -1,0 +1,22 @@
+{
+  "user": {
+    "name": "kritin",
+    "pronouns": "he/him",
+    "jobRole": "software developer",
+    "challenges": "Understanding vague messages, Saying no",
+    "communicationStyle": "short and direct"
+  },
+  "onboardingComplete": true,
+  "conversations": [],
+  "cameraEvents": [],
+  "habits": [
+    {
+      "name": "nail biting",
+      "addedAt": 1776056389027
+    },
+    {
+      "name": "hair touching",
+      "addedAt": 1776056389027
+    }
+  ]
+}
